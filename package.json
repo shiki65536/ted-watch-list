@@ -8,7 +8,8 @@
     "server": "nodemon server/server.js",
     "client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "npm install --prefix client && npm run build --prefix client"
+    "prebuild-client": "npm install --prefix client --include=dev",
+    "build": "npm run prebuild-client && npm run build --prefix client"
   },
   "author": "shiki65536",
   "license": "ISC",
