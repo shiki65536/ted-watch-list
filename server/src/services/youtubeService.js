@@ -1,5 +1,6 @@
 const axios = require("axios");
 
+
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 // Channel IDs and their Uploads Playlist IDs
@@ -23,10 +24,16 @@ class YouTubeService {
    * Get the API key to use (user's key or default)
    */
   getApiKey(userApiKey = null) {
-    if (!userApiKey) {
-      throw new Error("YouTube API Key is required");
+      if (userApiKey) {
+        return userApiKey;
+      }
+      
+      if (DEFAULT_YOUTUBE_API_KEY) {
+        return DEFAULT_YOUTUBE_API_KEY;
+      }
+      
+      throw new Error("YouTube API Key is required"); 
     }
-    return userApiKey;
   }
 
   /**

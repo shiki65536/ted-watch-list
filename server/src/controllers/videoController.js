@@ -68,14 +68,14 @@ exports.refreshVideos = async (req, res) => {
     const user = await User.findById(userId);
     const userApiKey = user?.youtubeApiKey;
 
-    if (!userApiKey) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "YouTube API key is missing. Please update your API key in settings.",
-        needsApiKey: true,
-      });
-    }
+    // if (!userApiKey) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "YouTube API key is missing. Please update your API key in settings.",
+    //     needsApiKey: true,
+    //   });
+    // }
 
     const channels = channel ? [channel] : ["ted", "teded", "tedx"];
 
@@ -91,7 +91,7 @@ exports.refreshVideos = async (req, res) => {
         const videos = await youtubeService.fetchAllChannelVideos(
           ch,
           0,
-          userApiKey
+          userApiKey || null
         );
 
         console.log(`   Processing ${videos.length} videos for ${ch}...`);
