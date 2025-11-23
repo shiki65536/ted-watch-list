@@ -15,7 +15,26 @@ const app = express();
 app.set("trust proxy", 1);
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: {
+      directives: {
+        "img-src": ["'self'", "data:", "https://i.ytimg.com"],
+
+        "frame-src": [
+          "'self'",
+          "https://www.youtube.com",
+          "https://www.youtube-nocookie.com",
+        ],
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "connect-src": ["'self'", process.env.CLIENT_URL],
+      },
+    },
+  })
+);
 
 // CORS configuration
 app.use(
