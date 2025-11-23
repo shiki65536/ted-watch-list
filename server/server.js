@@ -12,6 +12,7 @@ const errorHandler = require("./src/middleware/errorHandler");
 const { startScheduler, updateVideos } = require("./src/utils/scheduler");
 
 const app = express();
+app.set("trust proxy", 1);
 
 // Security middleware
 app.use(helmet());
