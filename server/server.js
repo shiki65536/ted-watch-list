@@ -221,6 +221,19 @@ mongoose
   .catch((err) => console.error("❌ MongoDB connection failed:", err));
 
 const PORT = process.env.PORT || 5001;
+
+const path = require("path");
+
+// Serve React build for any other route (SPA)
+if (process.env.NODE_ENV === "production") {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+  app.use(express.static(clientBuildPath));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
+  });
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 API Base: http://localhost:${PORT}/api`);
