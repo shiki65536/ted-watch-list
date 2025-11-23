@@ -1,34 +1,44 @@
 const axios = require("axios");
 
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
 // Channel IDs and their Uploads Playlist IDs
-// NOTE: These IDs were verified by querying YouTube API
 const CHANNELS = {
   ted: {
     channelId: "UCAuUUnT6oDeKwE6v1NGQxug",
-    uploadsId: "UUAuUUnT6oDeKwE6v1NGQxug", // Verified ✅
+    uploadsId: "UUAuUUnT6oDeKwE6v1NGQxug",
   },
   teded: {
     channelId: "UCsooa4yRKGN_zEE8iknghZA",
-    uploadsId: null, // Will be fetched dynamically
+    uploadsId: null,
   },
   tedx: {
     channelId: "UCsT0YIqwnpJCM-mx7-gSA4Q",
-    uploadsId: null, // Will be fetched dynamically
+    uploadsId: null,
   },
 };
 
 class YouTubeService {
   /**
+   * Get the API key to use (user's key or default)
+   */
+  getApiKey(userApiKey = null) {
+    if (!userApiKey) {
+      throw new Error("YouTube API Key is required");
+    }
+    return userApiKey;
+  }
+
+  /**
    * Get uploads playlist ID for a channel
    */
-  async getUploadsPlaylistId(channelId) {
+  async getUploadsPlaylistId(channelId, apiKey = null) {
     try {
+      const key = this.getApiKey(apiKey);
+
       const response = await axios.get(`${YOUTUBE_API_BASE}/channels`, {
         params: {
-          key: YOUTUBE_API_KEY,
+          key: key,
           id: channelId,
           part: "contentDetails",
         },
@@ -47,29 +57,33 @@ class YouTubeService {
 
   /**
    * Fetch ALL videos from a channel using Uploads Playlist
-   * This is the most efficient method (saves 98% quota vs search)
    * @param {string} channel - Channel name (ted, teded, tedx)
    * @param {number} maxVideos - Maximum videos to fetch (0 = unlimited)
+   * @param {string} userApiKey - Optional user's YouTube API key
    */
-  async fetchAllChannelVideos(channel, maxVideos = 0) {
+  async fetchAllChannelVideos(channel, maxVideos = 0, userApiKey) {
     try {
       const channelData = CHANNELS[channel];
+      const apiKey = this.getApiKey(userApiKey);
 
       if (!channelData) {
         throw new Error(`Unknown channel: ${channel}`);
       }
 
-      if (!YOUTUBE_API_KEY) {
+      if (!apiKey) {
         throw new Error("YouTube API key not configured");
       }
 
-      // Get uploads playlist ID (use cached if available, otherwise fetch)
+      console.log(`   Using ${userApiKey ? "user" : "default"} API key`);
+
+      // Get uploads playlist ID
       let uploadsPlaylistId = channelData.uploadsId;
 
       if (!uploadsPlaylistId) {
         console.log(`   Fetching uploads playlist ID for ${channel}...`);
         uploadsPlaylistId = await this.getUploadsPlaylistId(
-          channelData.channelId
+          channelData.channelId,
+          apiKey
         );
         console.log(`   Got playlist ID: ${uploadsPlaylistId}`);
       }
@@ -80,17 +94,16 @@ class YouTubeService {
       console.log(`   Playlist ID: ${uploadsPlaylistId}`);
       console.log("=".repeat(60));
 
-      // Step 1: Get all video IDs from playlist (SUPER CHEAP - 1 quota per 50 videos)
+      // Step 1: Get all video IDs
       const videoIds = await this.fetchPlaylistVideoIds(
         uploadsPlaylistId,
-        maxVideos
+        maxVideos,
+        apiKey
       );
-
       console.log(`\n✅ Found ${videoIds.length} videos in playlist`);
 
-      // Step 2: Get detailed info for all videos in batches (1 quota per 50 videos)
-      const videos = await this.fetchVideosDetails(videoIds, channel);
-
+      // Step 2: Get detailed info
+      const videos = await this.fetchVideosDetails(videoIds, channel, apiKey);
       console.log(`✅ Fetched details for ${videos.length} videos`);
       console.log("=".repeat(60));
 
@@ -106,9 +119,9 @@ class YouTubeService {
 
   /**
    * Fetch all video IDs from a playlist (paginated)
-   * Cost: 1 quota per page (50 videos)
    */
-  async fetchPlaylistVideoIds(playlistId, maxVideos = 0) {
+  async fetchPlaylistVideoIds(playlistId, maxVideos = 0, apiKey = null) {
+    const key = this.getApiKey(apiKey);
     let allVideoIds = [];
     let nextPageToken = null;
     let pageCount = 0;
@@ -119,7 +132,7 @@ class YouTubeService {
 
       const response = await axios.get(`${YOUTUBE_API_BASE}/playlistItems`, {
         params: {
-          key: YOUTUBE_API_KEY,
+          key: key,
           playlistId: playlistId,
           part: "contentDetails",
           maxResults: 50,
@@ -129,7 +142,7 @@ class YouTubeService {
 
       const videoIds = response.data.items
         .map((item) => item.contentDetails.videoId)
-        .filter((id) => id); // Remove any null/undefined
+        .filter((id) => id);
 
       allVideoIds = [...allVideoIds, ...videoIds];
       nextPageToken = response.data.nextPageToken;
@@ -138,14 +151,12 @@ class YouTubeService {
         `     ✓ Got ${videoIds.length} videos (total: ${allVideoIds.length})`
       );
 
-      // Stop if we've reached maxVideos limit
       if (maxVideos > 0 && allVideoIds.length >= maxVideos) {
         allVideoIds = allVideoIds.slice(0, maxVideos);
         console.log(`     ℹ️  Reached limit of ${maxVideos} videos`);
         break;
       }
 
-      // Small delay to avoid rate limiting
       if (nextPageToken) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -156,9 +167,9 @@ class YouTubeService {
 
   /**
    * Fetch detailed information for videos in batches
-   * Cost: 1 quota per 50 videos
    */
-  async fetchVideosDetails(videoIds, channel) {
+  async fetchVideosDetails(videoIds, channel, apiKey = null) {
+    const key = this.getApiKey(apiKey);
     const allVideos = [];
     const batchSize = 50;
     const totalBatches = Math.ceil(videoIds.length / batchSize);
@@ -173,7 +184,7 @@ class YouTubeService {
 
       const response = await axios.get(`${YOUTUBE_API_BASE}/videos`, {
         params: {
-          key: YOUTUBE_API_KEY,
+          key: key,
           id: batch.join(","),
           part: "snippet,statistics,contentDetails",
         },
@@ -199,7 +210,6 @@ class YouTubeService {
 
       allVideos.push(...videos);
 
-      // Small delay between batches
       if (i + batchSize < videoIds.length) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -209,49 +219,32 @@ class YouTubeService {
   }
 
   /**
-   * Backward compatibility: Old method using search
-   * Use this as fallback if playlist method fails
+   * Test if an API key is valid
    */
-  async fetchChannelVideosDeep(channel, totalDesired = 200, orderBy = "date") {
-    console.warn(
-      `⚠️  Using legacy search method (expensive). Consider using fetchAllChannelVideos instead.`
-    );
+  async testApiKey(apiKey) {
+    try {
+      if (!apiKey) return { valid: false, error: "API key is missing" };
 
-    const channelData = CHANNELS[channel];
-    if (!channelData) {
-      throw new Error(`Unknown channel: ${channel}`);
-    }
-
-    const order =
-      orderBy === "popular" || orderBy === "viewCount" ? "viewCount" : "date";
-    let allVideoIds = [];
-    let pageToken = null;
-
-    while (allVideoIds.length < totalDesired) {
       const response = await axios.get(`${YOUTUBE_API_BASE}/search`, {
         params: {
-          key: YOUTUBE_API_KEY,
-          channelId: channelData.channelId,
+          key: apiKey,
           part: "id",
-          order: order,
-          type: "video",
-          maxResults: 50,
-          pageToken: pageToken,
+          maxResults: 1,
+          q: "test",
         },
       });
 
-      const videoIds = response.data.items
-        .filter((item) => item.id.videoId)
-        .map((item) => item.id.videoId);
-
-      allVideoIds = [...allVideoIds, ...videoIds];
-      pageToken = response.data.nextPageToken;
-
-      if (!pageToken) break;
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      return {
+        valid: true,
+        quota: response.data.pageInfo,
+      };
+    } catch (error) {
+      console.error("API Key Validation Failed:", error.message);
+      return {
+        valid: false,
+        error: "Invalid API Key or Quota exceeded",
+      };
     }
-
-    return this.fetchVideosDetails(allVideoIds.slice(0, totalDesired), channel);
   }
 
   parseDuration(duration) {

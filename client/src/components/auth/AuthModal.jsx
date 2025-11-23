@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { X, HelpCircle, ExternalLink } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 
@@ -8,8 +8,10 @@ const AuthModal = ({ onClose }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [youtubeApiKey, setYoutubeApiKey] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showApiKeyHelp, setShowApiKeyHelp] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
@@ -20,7 +22,7 @@ const AuthModal = ({ onClose }) => {
     try {
       const result = isLogin
         ? await api.login(email, password)
-        : await api.register(email, password, username);
+        : await api.register(email, password, username, youtubeApiKey);
 
       if (result.success) {
         login(result.user, result.token);
@@ -29,8 +31,16 @@ const AuthModal = ({ onClose }) => {
         setError(result.message || "Operation failed. Please try again.");
       }
     } catch (err) {
-      setError("Network error. Please check your connection.");
+      // setError("Network error. Please check your connection.");
       console.error("Auth error:", err);
+      if (
+        err.message.includes("NetworkError") ||
+        err.message.includes("Failed to fetch")
+      ) {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -42,11 +52,12 @@ const AuthModal = ({ onClose }) => {
     setEmail("");
     setPassword("");
     setUsername("");
+    setYoutubeApiKey("");
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">
@@ -116,6 +127,52 @@ const AuthModal = ({ onClose }) => {
               disabled={loading}
             />
           </div>
+
+          {/* YouTube API Key (REQUIRED for Sign Up) */}
+          {!isLogin && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-300">
+                  YouTube API Key <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyHelp(!showApiKeyHelp)}
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  <HelpCircle size={16} />
+                </button>
+              </div>
+
+              {showApiKeyHelp && (
+                <div className="mb-2 p-3 bg-blue-900 bg-opacity-30 border border-blue-700 rounded text-sm text-blue-200">
+                  <p className="mb-2">
+                    <strong>Required:</strong> We use your personal API key to
+                    fetch data. This ensures you have full control and limits
+                    are not shared.
+                  </p>
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-blue-400 hover:text-blue-300"
+                  >
+                    Get your API key here
+                    <ExternalLink size={14} />
+                  </a>
+                </div>
+              )}
+
+              <input
+                type="text"
+                placeholder="AIza..."
+                value={youtubeApiKey}
+                onChange={(e) => setYoutubeApiKey(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-red-600 font-mono text-sm"
+                disabled={loading}
+              />
+            </div>
+          )}
 
           <button
             type="submit"

@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    youtubeApiKey: {
+      type: String,
+      required: [true, "YouTube API Key is required"],
+      trim: true,
+    },
     favourites: [
       {
         videoId: String,
@@ -38,22 +43,37 @@ const userSchema = new mongoose.Schema(
         },
       },
     ],
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// password salt
+// Password encryption before save
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
-// password validation
+// Password verification method
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Don't return sensitive data
+userSchema.methods.toJSON = function () {
+  const obj = this.toObject();
+  delete obj.password;
+  // Only return API key status, not the actual key
+  obj.hasApiKey = !!obj.youtubeApiKey;
+  delete obj.youtubeApiKey;
+  return obj;
 };
 
 module.exports = mongoose.model("User", userSchema);
