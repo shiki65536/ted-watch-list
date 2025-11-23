@@ -1,0 +1,22 @@
+{
+  "name": "ted-watch-list-root",
+  "version": "1.0.0",
+  "description": "Root configuration for MERN deployment",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "server": "nodemon server/server.js",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client"
+  },
+  "author": "shiki65536",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
