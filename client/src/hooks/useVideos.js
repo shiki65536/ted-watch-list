@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import api from "../services/api";
 
 export const useVideos = (
@@ -13,6 +13,9 @@ export const useVideos = (
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  // Use ref to track if we're currently fetching to prevent race conditions
+  const isFetchingRef = useRef(false);
+
   // Reset when channel or view changes
   useEffect(() => {
     console.log(
@@ -22,14 +25,15 @@ export const useVideos = (
     setPage(1);
     setHasMore(true);
     setError(null);
+    isFetchingRef.current = false;
   }, [selectedChannel, currentView]);
 
   // Fetch videos function
   const fetchVideos = useCallback(
     async (currentPage) => {
-      // Don't fetch if already loading
-      if (loading) {
-        console.log("⏸️  Already loading, skipping...");
+      // Prevent duplicate fetches
+      if (isFetchingRef.current) {
+        console.log("⏸️  Already fetching, skipping...");
         return;
       }
 
@@ -40,27 +44,51 @@ export const useVideos = (
       }
 
       console.log(
-        `📥 Fetching videos - Page: ${currentPage}, View: ${currentView}`
+        `📥 Fetching - Channel: ${selectedChannel}, View: ${currentView}, Page: ${currentPage}`
       );
+
+      isFetchingRef.current = true;
       setLoading(true);
       setError(null);
 
       try {
         let result;
 
-        if (currentView === "favourite" && isAuthenticated) {
+        if (currentView === "favourite") {
+          if (!isAuthenticated) {
+            console.log("⚠️  Not authenticated for favourites");
+            setVideos([]);
+            setHasMore(false);
+            return;
+          }
+
           console.log("📥 Fetching favourites...");
           result = await api.getFavourites(token);
           setVideos(result.data || []);
           setHasMore(false);
-        } else if (currentView === "watched" && isAuthenticated) {
+        } else if (currentView === "watched") {
+          if (!isAuthenticated) {
+            console.log("⚠️  Not authenticated for watched");
+            setVideos([]);
+            setHasMore(false);
+            return;
+          }
+
           console.log("📥 Fetching watched...");
           result = await api.getWatched(token);
           setVideos(result.data || []);
           setHasMore(false);
-        } else if (currentView === "bucket" && isAuthenticated) {
+        } else if (currentView === "bucket") {
+          if (!isAuthenticated) {
+            console.log("⚠️  Not authenticated for bucket");
+            setVideos([]);
+            setHasMore(false);
+            return;
+          }
+
           console.log(`📥 Fetching bucket - Page ${currentPage}...`);
           result = await api.getBucket(token, currentPage, 20);
+
           setVideos((prev) => {
             if (currentPage === 1) {
               return result.data || [];
@@ -73,22 +101,11 @@ export const useVideos = (
             }
           });
           setHasMore(result.hasMore);
-        } else if (currentView === "favourite" && !isAuthenticated) {
-          console.log("⚠️  Not authenticated for favourites");
-          setVideos([]);
-          setHasMore(false);
-        } else if (currentView === "watched" && !isAuthenticated) {
-          console.log("⚠️  Not authenticated for watched");
-          setVideos([]);
-          setHasMore(false);
-        } else if (currentView === "bucket" && !isAuthenticated) {
-          console.log("⚠️  Not authenticated for bucket");
-          setVideos([]);
-          setHasMore(false);
         } else {
           // Recent or Popular with pagination
           const sortBy = currentView === "popular" ? "popular" : "recent";
           console.log(`📥 Fetching ${sortBy} videos - Page ${currentPage}...`);
+
           result = await api.getVideos(
             selectedChannel,
             sortBy,
@@ -118,25 +135,30 @@ export const useVideos = (
 
           setHasMore(result.hasMore);
         }
+
+        console.log(
+          `✅ Fetch completed - Got ${result?.data?.length || 0} videos`
+        );
       } catch (err) {
         console.error("❌ Failed to load videos:", err);
         setError(err.message);
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
       }
     },
-    [selectedChannel, currentView, token, isAuthenticated, loading, hasMore]
+    [selectedChannel, currentView, token, isAuthenticated, hasMore]
   );
 
-  // Trigger fetch when page changes OR when dependencies change
+  // Trigger fetch when page changes OR when view/channel changes (via page reset)
   useEffect(() => {
-    console.log(`🎯 useEffect triggered - Page: ${page}`);
+    console.log(`🎯 useEffect triggered - Page: ${page}, View: ${currentView}`);
     fetchVideos(page);
-  }, [page, selectedChannel, currentView, isAuthenticated]); // Don't include fetchVideos in deps
+  }, [page, selectedChannel, currentView, isAuthenticated]);
 
   // Load more function
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
+    if (!loading && !isFetchingRef.current && hasMore) {
       console.log("📜 Load more triggered");
       setPage((prev) => prev + 1);
     }
@@ -144,12 +166,21 @@ export const useVideos = (
 
   // Refetch function (reset to page 1)
   const refetch = useCallback(() => {
-    console.log("🔄 Manual refetch triggered");
+    console.log(`🔄 Manual refetch triggered for view: ${currentView}`);
+
+    // Don't refetch if already fetching
+    if (isFetchingRef.current) {
+      console.log("⏸️  Already fetching, ignoring refetch");
+      return;
+    }
+
     setVideos([]);
     setPage(1);
     setHasMore(true);
     setError(null);
-  }, []);
+
+    // The useEffect will trigger fetchVideos when page is set to 1
+  }, [currentView]);
 
   return {
     videos,

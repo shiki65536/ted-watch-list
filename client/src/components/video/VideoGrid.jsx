@@ -12,6 +12,7 @@ const VideoGrid = ({
   currentView,
   onLoadMore,
   hasMore,
+  onPlay,
 }) => {
   const observerTarget = useRef(null);
 
@@ -70,6 +71,7 @@ const VideoGrid = ({
             onMarkAsWatched={onMarkAsWatched}
             onRemoveFromWatched={onRemoveFromWatched}
             showWatchedAction={showWatchedAction}
+            onPlay={onPlay}
           />
         ))}
       </div>
