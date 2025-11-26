@@ -1,4 +1,4 @@
-# TED Manager – Personal TED / TED-Ed / TEDx Video Tracker
+# TED Watch List – Personal TED / TED-Ed / TEDx Video Tracker
 
 A full-stack MERN app that lets users browse, favorite, mark as watched, remove functions for TED, TED-Ed, and TEDx videos with all-time popular sorting.
 
